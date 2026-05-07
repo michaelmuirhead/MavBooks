@@ -1,0 +1,28 @@
+{
+  "name": "mavbooks",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Scan books with your camera and track your reading. A Goodreads/Bookly-style web app, single-file static site.",
+  "homepage": "https://github.com/your-username/mavbooks",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-username/mavbooks.git"
+  },
+  "scripts": {
+    "dev": "npx --yes serve -l 8080 .",
+    "start": "npx --yes serve -l 8080 ."
+  },
+  "keywords": [
+    "books",
+    "reading",
+    "library",
+    "barcode",
+    "isbn",
+    "goodreads",
+    "bookly",
+    "static-site",
+    "vercel"
+  ],
+  "author": "Michael Muirhead",
+  "license": "MIT"
+}
