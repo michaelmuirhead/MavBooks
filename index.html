@@ -360,6 +360,40 @@
     border-radius: 12px;
     box-shadow: 0 0 0 9999px rgba(0,0,0,0.4);
   }
+  .cover-scan-frame {
+    width: 60%;
+    height: 88%;
+    border: 2px solid var(--accent);
+    border-radius: 8px;
+    box-shadow: 0 0 0 9999px rgba(0,0,0,0.4);
+  }
+  #cover-scanner-container {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 3/4;
+    background: black;
+    border-radius: var(--radius);
+    overflow: hidden;
+    margin-bottom: 12px;
+  }
+  #cover-scanner-video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .cover-change-link {
+    margin-top: 8px;
+    font-size: 12px;
+    color: var(--accent);
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    padding: 6px 10px;
+    border-radius: 999px;
+    width: 110px;
+    text-align: center;
+    transition: all 0.15s;
+  }
+  .cover-change-link:hover { background: var(--bg-input); border-color: var(--accent); }
   .scanner-status {
     position: absolute;
     bottom: 12px;
@@ -720,6 +754,10 @@
           <div class="opt-icon">📷</div>
           <div class="opt-text"><strong>Scan barcode</strong><span>Point your camera at the ISBN on the back cover</span></div>
         </button>
+        <button class="add-option" id="opt-cover-scan">
+          <div class="opt-icon">📸</div>
+          <div class="opt-text"><strong>Scan cover</strong><span>Snap the front cover, we'll read the title</span></div>
+        </button>
         <button class="add-option" id="opt-search">
           <div class="opt-icon">🔎</div>
           <div class="opt-text"><strong>Search by title</strong><span>Type a book title or author name</span></div>
@@ -746,6 +784,52 @@
         <div class="scanner-status" id="scanner-status">Looking for barcode...</div>
       </div>
       <button class="btn btn-secondary btn-block" id="scan-cancel">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-cover-scan">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Scan Book Cover</div>
+      <button class="modal-close" data-close>×</button>
+    </div>
+    <div class="modal-body">
+      <div id="cover-stage-camera">
+        <div id="cover-scanner-container">
+          <video id="cover-scanner-video" autoplay playsinline muted></video>
+          <div class="scanner-overlay"><div class="cover-scan-frame"></div></div>
+          <div class="scanner-status">Center the front cover, then tap Capture</div>
+        </div>
+        <div style="display:flex; gap:8px;">
+          <button class="btn btn-secondary" id="cover-cancel">Cancel</button>
+          <button class="btn btn-primary" id="cover-capture" style="flex:1;">📸 Capture cover</button>
+        </div>
+      </div>
+
+      <div id="cover-stage-processing" style="display:none;">
+        <div id="cover-preview-wrap" style="text-align:center; margin-bottom:16px;">
+          <img id="cover-preview" style="max-width:60%; max-height:240px; border-radius:var(--radius-sm); box-shadow:var(--shadow);" />
+        </div>
+        <div class="loading-row"><div class="spinner"></div></div>
+        <p style="text-align:center; color:var(--text-dim); margin-top:8px; font-size:13px;" id="cover-status">Loading text recognition...</p>
+      </div>
+
+      <div id="cover-stage-results" style="display:none;">
+        <div style="display:flex; gap:12px; margin-bottom:14px; align-items:flex-start;">
+          <img id="cover-preview-small" style="width:70px; aspect-ratio:2/3; object-fit:cover; border-radius:var(--radius-sm);" />
+          <div style="flex:1; min-width:0;">
+            <div class="field-label">Detected text</div>
+            <div id="cover-detected-text" style="padding:8px 10px; background:var(--bg-input); border-radius:var(--radius-sm); font-size:12px; color:var(--text-dim); max-height:80px; overflow-y:auto;"></div>
+          </div>
+        </div>
+        <div class="field-label" id="cover-results-label">Matching books</div>
+        <div id="cover-scan-results" class="search-results"></div>
+        <div style="display:flex; gap:8px; margin-top:14px;">
+          <button class="btn btn-secondary" id="cover-retry">Try again</button>
+          <button class="btn btn-secondary" id="cover-use-as-cover" style="margin-left:auto;">Use as custom cover</button>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -1341,9 +1425,12 @@ service cloud.firestore {
     const body = $('#detail-body');
     body.innerHTML = `
       <div class="book-detail-header">
-        ${b.cover
-          ? `<img class="book-detail-cover" src="${escapeHtml(b.cover)}" alt="" onerror="this.style.display='none'" />`
-          : `<div class="book-detail-cover" style="display:flex;align-items:center;justify-content:center;font-size:32px;color:var(--text-faint);">📕</div>`}
+        <div style="display:flex; flex-direction:column; align-items:center;">
+          ${b.cover
+            ? `<img class="book-detail-cover" src="${escapeHtml(b.cover)}" alt="" onerror="this.style.display='none'" />`
+            : `<div class="book-detail-cover" style="display:flex;align-items:center;justify-content:center;font-size:32px;color:var(--text-faint);">📕</div>`}
+          <button class="cover-change-link" id="btn-change-cover">${b.cover ? 'Change cover' : 'Add cover'}</button>
+        </div>
         <div class="book-detail-info">
           <div class="book-detail-title">${escapeHtml(b.title)}</div>
           <div class="book-detail-author">${escapeHtml(b.author)}</div>
@@ -1464,6 +1551,9 @@ service cloud.firestore {
       closeModal('modal-detail');
       toast('Deleted');
     });
+
+    // Change / add cover
+    $('#btn-change-cover').addEventListener('click', () => replaceCover(b.id));
   }
 
   // ========== SCANNER ==========
@@ -1516,6 +1606,202 @@ service cloud.firestore {
     try { zxingReader && zxingReader.reset(); } catch {}
     scannerControls = null;
     zxingReader = null;
+  }
+
+  // ========== IMAGE UTILS ==========
+  // Compress + resize an image (file or data URL) so we don't blow up storage.
+  async function compressImage(source, maxDim = 480, quality = 0.78) {
+    const dataUrl = source instanceof File || source instanceof Blob
+      ? await new Promise((res, rej) => {
+          const r = new FileReader();
+          r.onload = () => res(r.result);
+          r.onerror = rej;
+          r.readAsDataURL(source);
+        })
+      : source;
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        let { width, height } = img;
+        if (width > height && width > maxDim) {
+          height = Math.round((height * maxDim) / width);
+          width = maxDim;
+        } else if (height > maxDim) {
+          width = Math.round((width * maxDim) / height);
+          height = maxDim;
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = reject;
+      img.src = dataUrl;
+    });
+  }
+
+  function pickImageFromDevice() {
+    return new Promise(resolve => {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
+      input.onchange = () => resolve(input.files && input.files[0] ? input.files[0] : null);
+      input.click();
+    });
+  }
+
+  // ========== CHANGE COVER ==========
+  async function replaceCover(bookId) {
+    const file = await pickImageFromDevice();
+    if (!file) return;
+    toast('Resizing image...');
+    try {
+      const dataUrl = await compressImage(file, 480, 0.78);
+      updateBook(bookId, { cover: dataUrl });
+      toast('Cover updated');
+      // Re-render the open detail with the new cover
+      openDetail(bookId);
+    } catch (e) {
+      console.error(e);
+      toast('Could not load that image');
+    }
+  }
+
+  // ========== COVER SCANNER (OCR) ==========
+  let coverStream = null;
+  let lastCapturedCover = null;
+
+  async function startCoverScan() {
+    openModal('modal-cover-scan');
+    showCoverStage('camera');
+    try {
+      coverStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 1280 } },
+        audio: false,
+      });
+      const video = $('#cover-scanner-video');
+      video.srcObject = coverStream;
+      await video.play().catch(() => {});
+    } catch (e) {
+      console.error('Camera error', e);
+      toast('Camera unavailable — grant permission and use HTTPS');
+      closeModal('modal-cover-scan');
+    }
+  }
+
+  function stopCoverScan() {
+    try { coverStream && coverStream.getTracks().forEach(t => t.stop()); } catch {}
+    coverStream = null;
+  }
+
+  function showCoverStage(stage) {
+    ['camera', 'processing', 'results'].forEach(s => {
+      const el = $('#cover-stage-' + s);
+      if (el) el.style.display = s === stage ? '' : 'none';
+    });
+  }
+
+  async function captureCoverAndOCR() {
+    const video = $('#cover-scanner-video');
+    if (!video || !video.videoWidth) {
+      toast('Camera not ready yet');
+      return;
+    }
+    // Capture the current frame
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext('2d').drawImage(video, 0, 0);
+    const fullJpeg = canvas.toDataURL('image/jpeg', 0.92);
+    // Compressed version we'll keep if user wants to save it as the cover
+    const compressed = await compressImage(fullJpeg, 480, 0.78);
+    lastCapturedCover = compressed;
+
+    // Stop the live feed - we have our frame now
+    stopCoverScan();
+
+    // Show the captured image + processing state
+    showCoverStage('processing');
+    $('#cover-preview').src = fullJpeg;
+    $('#cover-status').textContent = 'Loading text recognition...';
+
+    try {
+      // Lazy-load Tesseract.js (~2MB, cached after first use)
+      const Tesseract = await import('https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/+esm');
+      $('#cover-status').textContent = 'Reading text from cover... (this can take a few seconds)';
+
+      const worker = await Tesseract.createWorker('eng', 1, {
+        logger: m => {
+          if (m.status === 'recognizing text') {
+            $('#cover-status').textContent = `Reading text... ${Math.round((m.progress || 0) * 100)}%`;
+          }
+        },
+      });
+      const { data: { text } } = await worker.recognize(fullJpeg);
+      await worker.terminate();
+
+      // Clean up the OCR text into a useful search query
+      const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+      // Prefer lines that look like a title (longest, mostly letters)
+      const candidate = lines
+        .filter(l => l.length >= 3)
+        .sort((a, b) => b.length - a.length)
+        .slice(0, 3)
+        .join(' ');
+      const cleanedQuery = candidate
+        .replace(/[^a-zA-Z0-9 '\-:&,.]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, 120);
+
+      $('#cover-detected-text').textContent = lines.length ? lines.slice(0, 6).join(' · ') : '(no text detected)';
+
+      if (!cleanedQuery) {
+        $('#cover-results-label').textContent = 'No matches';
+        $('#cover-scan-results').innerHTML = `<div class="empty-state" style="padding:20px;"><p>Couldn't read text from this cover. Try better lighting, or use the "Use as custom cover" button below.</p></div>`;
+        showCoverStage('results');
+        return;
+      }
+
+      // Search Open Library with the OCR text
+      $('#cover-status').textContent = 'Searching Open Library...';
+      const results = await searchBooks(cleanedQuery);
+      renderCoverScanResults(results, cleanedQuery);
+      showCoverStage('results');
+    } catch (e) {
+      console.error('OCR error', e);
+      $('#cover-detected-text').textContent = '(text recognition failed)';
+      $('#cover-scan-results').innerHTML = `<div class="empty-state" style="padding:20px;"><p>OCR failed. You can still save this image as a custom cover for a manually-added book.</p></div>`;
+      showCoverStage('results');
+    }
+  }
+
+  function renderCoverScanResults(items, query) {
+    const box = $('#cover-scan-results');
+    if (!items.length) {
+      $('#cover-results-label').textContent = `No matches for "${escapeHtml(query)}"`;
+      box.innerHTML = `<div class="empty-state" style="padding:20px;"><p>Try again with better focus, or use this as a custom cover.</p></div>`;
+      return;
+    }
+    $('#cover-results-label').textContent = `${items.length} possible matches`;
+    box.innerHTML = items.slice(0, 10).map((b, i) => `
+      <button class="search-result" data-i="${i}">
+        ${b.cover
+          ? `<img src="${escapeHtml(b.cover)}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';" /><div class="sr-cover" style="display:none;">📕</div>`
+          : `<div class="sr-cover">📕</div>`}
+        <div class="sr-info">
+          <div class="sr-title">${escapeHtml(b.title)}</div>
+          <div class="sr-meta">${escapeHtml(b.author)}${b.year ? ' · ' + b.year : ''}${b.pages ? ' · ' + b.pages + ' pages' : ''}</div>
+        </div>
+      </button>
+    `).join('');
+    $$('#cover-scan-results .search-result').forEach(el => el.addEventListener('click', () => {
+      const i = parseInt(el.dataset.i);
+      const book = addBook(items[i]);
+      closeModal('modal-cover-scan');
+      if (book) openDetail(book.id);
+    }));
   }
 
   // ========== SEARCH ==========
@@ -1584,6 +1870,10 @@ service cloud.firestore {
       closeModal('modal-add');
       startScanner();
     });
+    $('#opt-cover-scan').addEventListener('click', () => {
+      closeModal('modal-add');
+      startCoverScan();
+    });
     $('#opt-search').addEventListener('click', () => {
       closeModal('modal-add');
       openModal('modal-search');
@@ -1615,11 +1905,39 @@ service cloud.firestore {
       closeModal('modal-scan');
     });
 
+    // Cover scan controls
+    $('#cover-cancel').addEventListener('click', () => {
+      stopCoverScan();
+      closeModal('modal-cover-scan');
+    });
+    $('#cover-capture').addEventListener('click', () => {
+      $('#cover-preview-small').src = '';
+      captureCoverAndOCR().then(() => {
+        if (lastCapturedCover) $('#cover-preview-small').src = lastCapturedCover;
+      });
+    });
+    $('#cover-retry').addEventListener('click', () => {
+      lastCapturedCover = null;
+      startCoverScan();
+    });
+    $('#cover-use-as-cover').addEventListener('click', () => {
+      if (!lastCapturedCover) return toast('No image captured');
+      // Add a manual book with the captured photo as its cover
+      const title = prompt('Title for this book?');
+      if (!title) return;
+      const author = prompt('Author? (optional)') || 'Unknown';
+      const book = addBook({ title, author, cover: lastCapturedCover });
+      closeModal('modal-cover-scan');
+      lastCapturedCover = null;
+      if (book) openDetail(book.id);
+    });
+
     // Modal close on overlay click or [data-close]
     $$('.modal-overlay').forEach(o => {
       o.addEventListener('click', e => {
         if (e.target === o || e.target.hasAttribute('data-close')) {
           if (o.id === 'modal-scan') stopScanner();
+          if (o.id === 'modal-cover-scan') stopCoverScan();
           o.classList.remove('active');
         }
       });
@@ -1627,7 +1945,7 @@ service cloud.firestore {
 
     // Esc closes modal
     document.addEventListener('keydown', e => {
-      if (e.key === 'Escape') { stopScanner(); closeAllModals(); }
+      if (e.key === 'Escape') { stopScanner(); stopCoverScan(); closeAllModals(); }
     });
 
     // Click on a book card → open detail

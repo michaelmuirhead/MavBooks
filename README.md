@@ -11,8 +11,10 @@ Scan books with your camera, track your reading, sync across devices. A self-hos
 ## ✨ Features
 
 - 📷 **Barcode scanner** — point your phone at the ISBN on the back cover, auto-fetches title, cover, author, and page count from [Open Library](https://openlibrary.org)
+- 📸 **Cover scanner (OCR)** — snap the front of a book; on-device OCR via [Tesseract.js](https://tesseract.projectnaptha.com/) extracts the title text and finds matches in Open Library — no API key, no server, fully client-side
 - 🔎 **Title search** — find anything by title, author, or ISBN
 - ✏️ **Manual entry** — fallback for rare or unindexed books
+- 🖼️ **Custom covers** — upload your own image (or use the captured cover photo) when Open Library has no cover or you want a different one
 - 🗂️ **3 shelves** — To Read · Reading · Read (auto-stamps start/finish dates)
 - ⭐ **Star ratings + notes** — 1–5 stars and personal notes per book
 - 📈 **Page tracker** — current page out of total, with progress bar
@@ -116,6 +118,7 @@ No build step. No bundler. No node_modules required to run. Open the HTML file, 
 |---|---|
 | **Vanilla JS + HTML + CSS** | Zero build, zero dependencies to install, deploys anywhere static |
 | **[@zxing/browser](https://github.com/zxing-js/browser)** (CDN) | Mature barcode scanner, ESM module, no install |
+| **[Tesseract.js](https://tesseract.projectnaptha.com/)** (CDN, lazy) | OCR for cover scanning, runs in-browser, no API key |
 | **[Open Library API](https://openlibrary.org/developers/api)** | Free, no API key, millions of books with covers |
 | **Firebase Firestore + Auth** (CDN, optional) | Free cross-device sync, lazy-loaded only if user configures it |
 | **localStorage** | Default storage, works offline |
